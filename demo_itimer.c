@@ -9,7 +9,7 @@
 #include <sys/time.h>
 
 
-int gotit = 0;
+int gotit = 1;
 
 
 void timer_handler(int sig)
@@ -45,7 +45,7 @@ int main(void)
         printf("setitimer error.");
     }
 
-    for (;;)
+    for (int i=0 ;i < 3; i++)
     {
         if (gotit)
         {

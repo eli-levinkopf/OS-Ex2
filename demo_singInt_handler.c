@@ -27,7 +27,7 @@ int main(void)
         printf("sigaction error.");
     }
 
-    for (;;)
+    for (int i =0; i < 3 ; i++)
     {
         pause(); // wait until receiving a signal
     }
