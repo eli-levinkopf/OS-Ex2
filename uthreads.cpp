@@ -75,13 +75,16 @@ class thread {
  public:
   sigjmp_buf _env;
   thread() = default;
-  thread(int id, thread_entry_point entry_point)
+  thread(int id, thread_entry_point entry_point=nullptr)
       : _id(id), _state(READY), _stack(new char[STACK_SIZE]) {
-    auto sp = (address_t) _stack + STACK_SIZE - sizeof(address_t);
-    auto pc = (address_t) entry_point;
-    sigsetjmp(_env, 1);
-    (_env->__jmpbuf)[JB_SP] = translate_address(sp);
-    (_env->__jmpbuf)[JB_PC] = translate_address(pc);
+
+    if (_id) {
+      sigsetjmp(_env, 1);
+      auto sp = (address_t) _stack + STACK_SIZE - sizeof(address_t);
+      auto pc = (address_t) entry_point;
+      (_env->__jmpbuf)[JB_PC] = translate_address(pc);
+      (_env->__jmpbuf)[JB_SP] = translate_address(sp);
+    }
     sigemptyset(&_env->__saved_mask);
   }
 
@@ -106,18 +109,34 @@ int quantum;
 struct itimerval timer;
 thread running;
 
+void f() {
+  while (1) {
+//    if (running.get_id() == 0) {
+//      std::cerr << "????????????????????????????????????????????????????????????????????"<< std::endl;
+//      exit(1);
+//    }
+      std::cout << running.get_id() << std::endl;
+    }
+
+
+}
+
 void timer_handler(int sig) {
   if (!ready.empty()) {
     //TODO sp and pc are correct?
+    std::vector<std::pair<thread, bool>> t = threads;
     int ret_val = sigsetjmp(running._env, 1);
-    std::cout << (running.get_id() == threads[ret_val].first.get_id());
+//    if (ret_val != 0) {
+//      std::cout << "!!!!!!!" << std::endl;
+//    }
+    bool did_just_save_bookmark = ret_val == 0;
+    std::queue<thread> t1 = ready;
     ready.push(running);
     running = ready.front();
     ready.pop();
-    siglongjmp(running._env, 1);
-  }
-  else{
-    std::cout<<"====="<<std::endl;
+    if (did_just_save_bookmark) {
+      siglongjmp(running._env, 1);
+    }
   }
 }
 
@@ -131,18 +150,23 @@ int uthread_init(int quantum_usecs) {
     std::cerr << ERROR << SIG_ACTION_ERROR << std::endl;
     exit(EXIT_FAILURE);
   }
-  thread main = thread(0, main_entry_point);
+  int id = 0;
+  thread main = thread(id);
   std::pair<thread, bool> pair(main, true);
   threads.push_back(pair);
-  ready.push(main);
+  running = main;
+
   // Configure the timer to expire after 1 sec... */
-  timer.it_value.tv_sec = 1;        // first time interval, seconds part
-  timer.it_value.tv_usec = 0;        // first time interval, microseconds part
+  timer.it_value.tv_sec = 0;        // first time interval, seconds part
+  timer.it_value.tv_usec = quantum_usecs;        // first time interval, microseconds part
 
   // configure the timer to expire every quantum_usecs after that.
   timer.it_interval.tv_sec = 0;    // following time intervals, seconds part
   timer.it_interval.tv_usec = quantum_usecs;    // following time intervals, microseconds part
-
+  if (setitimer(ITIMER_VIRTUAL, &timer, nullptr)) {
+    std::cerr << ERROR << SET_TIMER_ERROR << std::endl;
+    exit(EXIT_FAILURE);
+  }
   // Start a virtual timer. It counts down whenever this process is executing.
   quantum = quantum_usecs;
   return SUCCESS;
@@ -161,20 +185,23 @@ int uthread_spawn(thread_entry_point entry_point) {
     return FAILURE;
   }
   thread new_thread = thread(active_threads, entry_point);
-  std::pair<thread, bool> pair(new_thread, true);
-  threads[active_threads] = pair;
+  std::pair<thread, bool> pair;
+  pair.first = new_thread;
+  pair.second = true;
+  auto pos = threads.begin() + active_threads;
+  threads.insert(pos, pair);
   ready.push(new_thread);
-  if (new_thread.get_id() == 1) {
-    if (setitimer(ITIMER_VIRTUAL, &timer, nullptr)) {
-      std::cerr << ERROR << SET_TIMER_ERROR << std::endl;
-      exit(EXIT_FAILURE);
-    }
-//    siglongjmp(running._env, 1);
-  }
   return SUCCESS;
 }
 
 int main(){
-  uthread_init (6);
-  uthread_spawn(main_entry_point);
-}
+  uthread_init (1);
+  uthread_spawn (f);
+//  uthread_spawn (f);
+    for (;;)
+    {
+        std::cout << "main"<< std::endl;
+      }
+
+    }
+

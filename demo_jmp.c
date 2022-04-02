@@ -69,6 +69,7 @@ void jump_to_thread(int tid)
 {
     current_thread = tid;
     siglongjmp(env[tid], 1);
+
 }
 
 /**
@@ -99,7 +100,7 @@ void thread0(void)
             printf("thread0: yielding\n");
             yield();
         }
-        usleep(SECOND);
+//        usleep(SECOND);
     }
 }
 
@@ -116,7 +117,7 @@ void thread1(void)
             printf("thread1: yielding\n");
             yield();
         }
-        usleep(SECOND);
+//        usleep(SECOND);
     }
 }
 
@@ -130,6 +131,8 @@ void setup_thread(int tid, char *stack, thread_entry_point entry_point)
     sigsetjmp(env[tid], 1);
     (env[tid]->__jmpbuf)[JB_SP] = translate_address(sp);
     (env[tid]->__jmpbuf)[JB_PC] = translate_address(pc);
+
+
     sigemptyset(&env[tid]->__saved_mask);
 }
 

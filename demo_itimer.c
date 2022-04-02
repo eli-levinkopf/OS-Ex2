@@ -9,7 +9,7 @@
 #include <sys/time.h>
 
 
-int gotit = 1;
+int gotit = 0;
 
 
 void timer_handler(int sig)
