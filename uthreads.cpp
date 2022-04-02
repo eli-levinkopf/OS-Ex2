@@ -69,10 +69,11 @@ enum state {
 
 class thread {
   int _id;
-  sigjmp_buf _env;
+//  sigjmp_buf _env;
   enum state _state;
   char* _stack;
  public:
+  sigjmp_buf _env;
   thread() = default;
   thread(int id, thread_entry_point entry_point)
       : _id(id), _state(READY), _stack(new char[STACK_SIZE]) {
@@ -86,12 +87,14 @@ class thread {
 
 
 
-  ~thread() {
-    delete[] _stack;
-  }
-  sigjmp_buf get_env() const {
-    return _env;
-  }
+//  ~thread() {
+//    delete[] _stack;
+//  }
+
+//  sigjmp_buf* get_env() const {
+//    return _env;
+//  }
+
   int get_id() const {
     return _id;
   }
@@ -102,15 +105,19 @@ std::vector<std::pair<thread, bool>> threads;
 int quantum;
 struct itimerval timer;
 thread running;
+
 void timer_handler(int sig) {
   if (!ready.empty()) {
     //TODO sp and pc are correct?
-    int ret_val = sigsetjmp(running.get_env(), 1);
+    int ret_val = sigsetjmp(running._env, 1);
     std::cout << (running.get_id() == threads[ret_val].first.get_id());
     ready.push(running);
     running = ready.front();
     ready.pop();
-    siglongjmp(running.get_env(), 1);
+    siglongjmp(running._env, 1);
+  }
+  else{
+    std::cout<<"====="<<std::endl;
   }
 }
 
@@ -118,7 +125,7 @@ int uthread_init(int quantum_usecs) {
   if (quantum_usecs < 0) {
     return FAILURE;
   }
-  struct sigaction sa = {0};
+  struct sigaction sa = {nullptr};
   sa.sa_handler = &timer_handler;
   if (sigaction(SIGVTALRM, &sa, nullptr) < 0) {
     std::cerr << ERROR << SIG_ACTION_ERROR << std::endl;
@@ -138,7 +145,7 @@ int uthread_init(int quantum_usecs) {
       quantum_usecs;    // following time intervals, microseconds part
 
   // Start a virtual timer. It counts down whenever this process is executing.
-  if (setitimer(ITIMER_VIRTUAL, &timer, NULL)) {
+  if (setitimer(ITIMER_VIRTUAL, &timer, nullptr)) {
     std::cerr << ERROR << SET_TIMER_ERROR << std::endl;
     exit(EXIT_FAILURE);
   }
@@ -165,6 +172,6 @@ int uthread_spawn(thread_entry_point entry_point) {
   return SUCCESS;
 }
 
-int main() {
-  std::cerr << "a";
+int main(){
+  uthread_init (6);
 }

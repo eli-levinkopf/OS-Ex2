@@ -45,7 +45,7 @@ int main(void)
         printf("setitimer error.");
     }
 
-    for (int i=0 ;i < 3; i++)
+    for (;;)
     {
         if (gotit)
         {
