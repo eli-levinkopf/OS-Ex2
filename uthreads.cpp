@@ -139,16 +139,11 @@ int uthread_init(int quantum_usecs) {
   timer.it_value.tv_sec = 1;        // first time interval, seconds part
   timer.it_value.tv_usec = 0;        // first time interval, microseconds part
 
-  // configure the timer to expire every 3 sec after that.
+  // configure the timer to expire every quantum_usecs after that.
   timer.it_interval.tv_sec = 0;    // following time intervals, seconds part
-  timer.it_interval.tv_usec =
-      quantum_usecs;    // following time intervals, microseconds part
+  timer.it_interval.tv_usec = quantum_usecs;    // following time intervals, microseconds part
 
   // Start a virtual timer. It counts down whenever this process is executing.
-  if (setitimer(ITIMER_VIRTUAL, &timer, nullptr)) {
-    std::cerr << ERROR << SET_TIMER_ERROR << std::endl;
-    exit(EXIT_FAILURE);
-  }
   quantum = quantum_usecs;
   return SUCCESS;
 }
@@ -169,9 +164,17 @@ int uthread_spawn(thread_entry_point entry_point) {
   std::pair<thread, bool> pair(new_thread, true);
   threads[active_threads] = pair;
   ready.push(new_thread);
+  if (new_thread.get_id() == 1) {
+    if (setitimer(ITIMER_VIRTUAL, &timer, nullptr)) {
+      std::cerr << ERROR << SET_TIMER_ERROR << std::endl;
+      exit(EXIT_FAILURE);
+    }
+//    siglongjmp(running._env, 1);
+  }
   return SUCCESS;
 }
 
 int main(){
   uthread_init (6);
+  uthread_spawn(main_entry_point);
 }
