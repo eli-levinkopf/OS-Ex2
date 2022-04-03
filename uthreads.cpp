@@ -110,12 +110,13 @@ struct itimerval timer;
 thread running;
 
 void f() {
+  int i = 0;
   while (1) {
-//    if (running.get_id() == 0) {
-//      std::cerr << "????????????????????????????????????????????????????????????????????"<< std::endl;
-//      exit(1);
-//    }
-      std::cout << running.get_id() << std::endl;
+    i++;
+if (i%100000 == 0){
+  std::cout << running.get_id();
+
+}
     }
 
 
@@ -124,19 +125,17 @@ void f() {
 void timer_handler(int sig) {
   if (!ready.empty()) {
     //TODO sp and pc are correct?
-    std::vector<std::pair<thread, bool>> t = threads;
     int ret_val = sigsetjmp(running._env, 1);
-//    if (ret_val != 0) {
-//      std::cout << "!!!!!!!" << std::endl;
-//    }
     bool did_just_save_bookmark = ret_val == 0;
-    std::queue<thread> t1 = ready;
+    if (ret_val){ return;}
     ready.push(running);
     running = ready.front();
     ready.pop();
-    if (did_just_save_bookmark) {
+//    siglongjmp(running._env, 1);
+//    if (did_just_save_bookmark) {
       siglongjmp(running._env, 1);
-    }
+//    }
+//    else{return;}
   }
 }
 
@@ -157,12 +156,12 @@ int uthread_init(int quantum_usecs) {
   running = main;
 
   // Configure the timer to expire after 1 sec... */
-  timer.it_value.tv_sec = 0;        // first time interval, seconds part
-  timer.it_value.tv_usec = quantum_usecs;        // first time interval, microseconds part
+  timer.it_value.tv_sec = quantum_usecs/1000000;        // first time interval, seconds part
+  timer.it_value.tv_usec = quantum_usecs%1000000;        // first time interval, microseconds part
 
   // configure the timer to expire every quantum_usecs after that.
-  timer.it_interval.tv_sec = 0;    // following time intervals, seconds part
-  timer.it_interval.tv_usec = quantum_usecs;    // following time intervals, microseconds part
+  timer.it_interval.tv_sec = quantum_usecs/1000000;    // following time intervals, seconds part
+  timer.it_interval.tv_usec = quantum_usecs%1000000;    // following time intervals, microseconds part
   if (setitimer(ITIMER_VIRTUAL, &timer, nullptr)) {
     std::cerr << ERROR << SET_TIMER_ERROR << std::endl;
     exit(EXIT_FAILURE);
@@ -195,12 +194,15 @@ int uthread_spawn(thread_entry_point entry_point) {
 }
 
 int main(){
-  uthread_init (1);
+  uthread_init (100000);
   uthread_spawn (f);
-//  uthread_spawn (f);
+  uthread_spawn (f);
+  int i = 0;
     for (;;)
     {
-        std::cout << "main"<< std::endl;
+      i++;
+      if ((i % 100000) == 0)
+          std::cout << "main";
       }
 
     }
