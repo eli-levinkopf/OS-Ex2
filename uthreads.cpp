@@ -112,13 +112,13 @@ thread running;
 
 void f ()
 {
-  int flag = 1;
+  int i = 0;
   while (1)
 	{
-	  if (flag)
+	  i++;
+	  if (i % 10000 == 0)
 		{
-		  std::cout << running.get_id () << std::endl;
-		  flag = 0;
+		  std::cout << running.get_id ();
 		}
 	}
 }
@@ -200,16 +200,21 @@ int uthread_spawn (thread_entry_point entry_point)
 
 int main ()
 {
-  uthread_init (100000);
+  uthread_init (1);
+  uthread_spawn (f);
+  uthread_spawn (f);
   uthread_spawn (f);
   uthread_spawn (f);
   int i = 0;
-  for (;;)
-	{
-	  i++;
-	  if ((i % 100000) == 0)
-		std::cout << "main";
-	}
+  while (1)
+  {
+    i++;
+    if (i%10000==0)
+    {
+      std::cout << running.get_id ();
+    }
+
+  }
 
 }
 
