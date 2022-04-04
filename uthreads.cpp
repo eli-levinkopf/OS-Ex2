@@ -13,13 +13,14 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <stdbool.h>
-using std::queue;
-using std::vector;
 #define SUCCESS 0
 #define FAILURE -1
 #define ERROR "system error: "
 #define SIG_ACTION_ERROR "sigaction error."
 #define SET_TIMER_ERROR "setitimer error."
+
+using std::queue;
+using std::vector;
 
 #ifdef __x86_64__
 /* code for 64 bit Intel arch */
@@ -30,10 +31,11 @@ typedef unsigned long address_t;
 
 /* A translation is required when using an address of a variable.
    Use this as a black box in your code. */
-address_t translate_address(address_t addr) {
+address_t translate_address (address_t addr)
+{
   address_t ret;
   asm volatile("xor    %%fs:0x30,%0\n"
-               "rol    $0x11,%0\n"
+			   "rol    $0x11,%0\n"
   : "=g" (ret)
   : "0" (addr));
   return ret;
@@ -51,14 +53,13 @@ typedef unsigned int address_t;
    Use this as a black box in your code. */
 address_t translate_address(address_t addr)
 {
-    address_t ret;
-    asm volatile("xor    %%gs:0x18,%0\n"
-                 "rol    $0x9,%0\n"
-    : "=g" (ret)
-    : "0" (addr));
-    return ret;
+	address_t ret;
+	asm volatile("xor    %%gs:0x18,%0\n"
+				 "rol    $0x9,%0\n"
+	: "=g" (ret)
+	: "0" (addr));
+	return ret;
 }
-
 
 #endif
 
@@ -69,26 +70,26 @@ enum state {
 
 class thread {
   int _id;
-//  sigjmp_buf _env;
   enum state _state;
-  char* _stack;
+  char *_stack;
+
  public:
   sigjmp_buf _env;
-  thread() = default;
-  thread(int id, thread_entry_point entry_point=nullptr)
-      : _id(id), _state(READY), _stack(new char[STACK_SIZE]) {
+  thread () = default;
+  thread (int id, thread_entry_point entry_point = nullptr)
+	  : _id (id), _state (READY), _stack (new char[STACK_SIZE])
+  {
 
-    if (_id) {
-      sigsetjmp(_env, 1);
-      auto sp = (address_t) _stack + STACK_SIZE - sizeof(address_t);
-      auto pc = (address_t) entry_point;
-      (_env->__jmpbuf)[JB_PC] = translate_address(pc);
-      (_env->__jmpbuf)[JB_SP] = translate_address(sp);
-    }
-    sigemptyset(&_env->__saved_mask);
+	if (_id)
+	  {
+		sigsetjmp (_env, 1);
+		auto sp = (address_t)_stack + STACK_SIZE - sizeof (address_t);
+		auto pc = (address_t)entry_point;
+		(_env->__jmpbuf)[JB_PC] = translate_address (pc);
+		(_env->__jmpbuf)[JB_SP] = translate_address (sp);
+	  }
+	sigemptyset(&_env->__saved_mask);
   }
-
-
 
 //  ~thread() {
 //    delete[] _stack;
@@ -97,9 +98,9 @@ class thread {
 //  sigjmp_buf* get_env() const {
 //    return _env;
 //  }
-
-  int get_id() const {
-    return _id;
+  int get_id () const
+  {
+	return _id;
   }
 };
 
@@ -109,101 +110,106 @@ int quantum;
 struct itimerval timer;
 thread running;
 
-void f() {
-  int i = 0;
-  while (1) {
-    i++;
-if (i%100000 == 0){
-  std::cout << running.get_id();
-
-}
-    }
-
-
-}
-
-void timer_handler(int sig) {
-  if (!ready.empty()) {
-    //TODO sp and pc are correct?
-    int ret_val = sigsetjmp(running._env, 1);
-    bool did_just_save_bookmark = ret_val == 0;
-    if (ret_val){ return;}
-    ready.push(running);
-    running = ready.front();
-    ready.pop();
-//    siglongjmp(running._env, 1);
-//    if (did_just_save_bookmark) {
-      siglongjmp(running._env, 1);
-//    }
-//    else{return;}
-  }
+void f ()
+{
+  int flag = 1;
+  while (1)
+	{
+	  if (flag)
+		{
+		  std::cout << running.get_id () << std::endl;
+		  flag = 0;
+		}
+	}
 }
 
-int uthread_init(int quantum_usecs) {
-  if (quantum_usecs < 0) {
-    return FAILURE;
-  }
+void timer_handler (int sig)
+{
+  if (!ready.empty ())
+	{
+	  //TODO sp and pc are correct?
+	  int ret_val = sigsetjmp (running._env, 1);
+	  if (ret_val)
+		{ return; }
+	  ready.push (running);
+	  running = ready.front ();
+	  ready.pop ();
+	  siglongjmp (running._env, 1);
+	}
+}
+
+int uthread_init (int quantum_usecs)
+{
+  if (quantum_usecs < 0)
+	{
+	  return FAILURE;
+	}
   struct sigaction sa = {nullptr};
   sa.sa_handler = &timer_handler;
-  if (sigaction(SIGVTALRM, &sa, nullptr) < 0) {
-    std::cerr << ERROR << SIG_ACTION_ERROR << std::endl;
-    exit(EXIT_FAILURE);
-  }
+  if (sigaction (SIGVTALRM, &sa, nullptr) < 0)
+	{
+	  std::cerr << ERROR << SIG_ACTION_ERROR << std::endl;
+	  exit (EXIT_FAILURE);
+	}
   int id = 0;
-  thread main = thread(id);
-  std::pair<thread, bool> pair(main, true);
-  threads.push_back(pair);
+  thread main = thread (id);
+  std::pair<thread, bool> pair (main, true);
+  threads.push_back (pair);
   running = main;
 
   // Configure the timer to expire after 1 sec... */
-  timer.it_value.tv_sec = quantum_usecs/1000000;        // first time interval, seconds part
-  timer.it_value.tv_usec = quantum_usecs%1000000;        // first time interval, microseconds part
-
+  timer.it_value.tv_sec = quantum_usecs / 1000000;
+  timer.it_value.tv_usec = quantum_usecs % 1000000;
   // configure the timer to expire every quantum_usecs after that.
-  timer.it_interval.tv_sec = quantum_usecs/1000000;    // following time intervals, seconds part
-  timer.it_interval.tv_usec = quantum_usecs%1000000;    // following time intervals, microseconds part
-  if (setitimer(ITIMER_VIRTUAL, &timer, nullptr)) {
-    std::cerr << ERROR << SET_TIMER_ERROR << std::endl;
-    exit(EXIT_FAILURE);
-  }
+  timer.it_interval.tv_sec = quantum_usecs / 1000000;
+  timer.it_interval.tv_usec = quantum_usecs % 1000000;
+  if (setitimer (ITIMER_VIRTUAL, &timer, nullptr))
+	{
+	  std::cerr << ERROR << SET_TIMER_ERROR << std::endl;
+	  exit (EXIT_FAILURE);
+	}
   // Start a virtual timer. It counts down whenever this process is executing.
   quantum = quantum_usecs;
   return SUCCESS;
 }
 
-int uthread_spawn(thread_entry_point entry_point) {
+int uthread_spawn (thread_entry_point entry_point)
+{
   int active_threads = 0;
-  for (auto pair: threads) {
-    if (pair.second) {
-      active_threads++;
-    } else {
-      break;
-    }
-  }
-  if (active_threads >= MAX_THREAD_NUM) {
-    return FAILURE;
-  }
-  thread new_thread = thread(active_threads, entry_point);
+  for (auto pair: threads)
+	{
+	  if (pair.second)
+		{
+		  active_threads++;
+		}
+	  else {break;}
+	}
+  if (active_threads >= MAX_THREAD_NUM)
+	{
+	  return FAILURE;
+	}
+  thread new_thread = thread (active_threads, entry_point);
   std::pair<thread, bool> pair;
   pair.first = new_thread;
   pair.second = true;
-  auto pos = threads.begin() + active_threads;
-  threads.insert(pos, pair);
-  ready.push(new_thread);
+  auto pos = threads.begin () + active_threads;
+  threads.insert (pos, pair);
+  ready.push (new_thread);
   return SUCCESS;
 }
 
-int main(){
+int main ()
+{
   uthread_init (100000);
   uthread_spawn (f);
   uthread_spawn (f);
   int i = 0;
-    for (;;)
-    {
-      i++;
-      if ((i % 100000) == 0)
-          std::cout << "main";
-      }
+  for (;;)
+	{
+	  i++;
+	  if ((i % 100000) == 0)
+		std::cout << "main";
+	}
 
-    }
+}
 
