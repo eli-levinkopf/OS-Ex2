@@ -4,6 +4,7 @@
 #include "uthreads.h"
 #include <stdlib.h>
 #include <iostream>
+#include <map>
 #include <sys/time.h>
 #include <queue>
 #include <vector>
@@ -18,6 +19,7 @@
 #define ERROR "system error: "
 #define SIG_ACTION_ERROR "sigaction error."
 #define SET_TIMER_ERROR "setitimer error."
+#define TID_ERROR "no thread with ID tid exists"
 
 using std::queue;
 using std::vector;
@@ -67,19 +69,20 @@ int get_next_available_id ();
 
 thread_entry_point main_entry_point;
 enum state {
-  RUNNING, READY, BLOCKED, SLEEPING
+  RUNNING, READY, BLOCKED, SLEEPING, TERMINATED
 };
 
 class thread {
   int _id;
   enum state _state;
   char *_stack;
+  int _num_of_quantums;
 
- public:
+public:
   sigjmp_buf _env;
   thread () = default;
-  thread (int id, thread_entry_point entry_point = nullptr)
-	  : _id (id), _state (READY), _stack (new char[STACK_SIZE])
+  thread (const int &id, thread_entry_point entry_point = nullptr)
+	  : _id (id), _state (READY), _stack (new char[STACK_SIZE]), _num_of_quantums(0)
   {
 	if (_id)
 	  {
@@ -101,14 +104,25 @@ class thread {
   int get_id () const
   {return _id;}
 
+  int get_num_of_quantums() const
+  {return _num_of_quantums;}
+
+  int get_state()const
+  {return _state;}
+
+  void set_quantum()
+  {++_num_of_quantums;}
+
 };
 
 queue<thread> ready;
-std::vector<std::pair<thread, bool>> threads;
+//std::vector<std::pair<thread, bool>> threads;
 int quantum;
 struct itimerval timer;
 void setup_timer (int quantum_usecs);
 thread running;
+int total_quantums = 0;
+std::map<int, thread> threads;
 
 
 void timer_handler (int sig)
@@ -117,10 +131,16 @@ void timer_handler (int sig)
 	{
 	  int ret_val = sigsetjmp (running._env, 1);
 	  if (ret_val)
-		{ return; }
+		{
+		  threads[running.get_id ()].set_quantum();
+		  ++total_quantums;
+		  return;
+		}
 	  ready.push (running);
 	  running = ready.front ();
 	  ready.pop ();
+	  threads[running.get_id ()].set_quantum();
+	  ++total_quantums;
 	  siglongjmp (running._env, 1);
 	}
 }
@@ -132,8 +152,8 @@ int uthread_init (int quantum_usecs)
 
   setup_timer (quantum_usecs);
   thread main = thread (0);
-  std::pair<thread, bool> pair (main, true);
-  threads.push_back (pair);
+//  std::pair<thread, bool> pair (main, true);
+  threads[0] = main;
   running = main;
   quantum = quantum_usecs;
   return SUCCESS;
@@ -165,20 +185,32 @@ int uthread_spawn (thread_entry_point entry_point)
   int id = get_next_available_id();
 //  std::cout<<id<<std::endl;
   thread new_thread = thread (id, entry_point);
-  std::pair<thread, bool> pair(new_thread, true);
-  auto t = threads;
-  auto pos = threads.begin() + id;
-  threads.insert (pos, pair);
-  auto t1 = threads;
+//  std::pair<thread, bool> pair(new_thread, true);
+  threads[id] = new_thread;
   ready.push (new_thread);
   return SUCCESS;
 }
 
+int uthread_get_tid()
+	{return running.get_id();}
+
+
+int uthread_get_total_quantums()
+	{return total_quantums;}
+
+int uthread_get_quantums(int tid){
+  if (threads.find(tid) == threads.end()){
+	std::cerr << ERROR << TID_ERROR << std::endl;
+	exit (EXIT_FAILURE);
+  }
+  return threads[tid].get_num_of_quantums();
+}
+
 int get_next_available_id (){
   int active_threads = 0;
-  for (auto pair: threads)
+  for (auto const &it: threads)
 	{
-	  if (pair.second)
+	  if (it.second.get_state() != TERMINATED)
 		{
 		  active_threads++;
 		}
