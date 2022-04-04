@@ -163,9 +163,13 @@ void setup_timer (int quantum_usecs)
 int uthread_spawn (thread_entry_point entry_point)
 {
   int id = get_next_available_id();
+//  std::cout<<id<<std::endl;
   thread new_thread = thread (id, entry_point);
   std::pair<thread, bool> pair(new_thread, true);
-  threads[id] = pair;
+  auto t = threads;
+  auto pos = threads.begin() + id;
+  threads.insert (pos, pair);
+  auto t1 = threads;
   ready.push (new_thread);
   return SUCCESS;
 }
