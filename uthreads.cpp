@@ -4,37 +4,47 @@
 //#include"uthreads.h"
 #include "thread.h"
 
-queue<thread> ready;
+std::deque<thread*> ready;
 int running_id;
-std::map<int, thread> threads;
-thread_entry_point main_entry_point;
+std::map<int, thread*> threads;
 sigset_t set;
 int get_next_available_id();
 void setup_timer(int quantum_usecs);
 void remove_thread();
 void block_signals();
 void unblock_signals();
+void sleep_wake();
 
 void timer_handler(int sig) {
+    sleep_wake();
+    int b = running_id;
   if (!ready.empty()) {
-	if (threads[running_id].get_state() != TERMINATED) {
-	  int ret_val = sigsetjmp(threads[running_id]._env, 1);
+	if (threads[running_id]->get_state() != TERMINATED) {
+	  int ret_val = sigsetjmp(threads[running_id]->_env, 1);
 	  if (ret_val) {
-		threads[running_id].set_quantum();
+		threads[running_id]->set_quantum();
 		++total_quantums;
 		return;
 	  }
-	  if (threads[running_id].get_state() != BLOCKED) {
-		ready.push(threads[running_id]);
-	  }
 	}
-	threads[running_id].set_state(READY);
-	running_id = ready.front().get_id();
-	threads[running_id].set_state(RUNNING);
-	ready.pop();
-	threads[running_id].set_quantum();
+
+	if (threads[running_id]->get_state() == RUNNING) {
+	    ready.push_back(threads[running_id]);
+	    threads[running_id]->set_state(READY);
+	}
+
+
+	running_id = ready.front()->get_id();
+	threads[running_id]->set_state(RUNNING);
+	ready.pop_front();
+	threads[running_id]->set_quantum();
 	++total_quantums;
-	siglongjmp(threads[running_id]._env, 1);
+	int a = running_id;
+	siglongjmp(threads[running_id]->_env, 1);
+  }
+  else {
+      threads[running_id]->set_quantum();
+      ++total_quantums;
   }
 }
 
@@ -43,7 +53,7 @@ int uthread_init(int quantum_usecs) {
 
   setup_timer(quantum_usecs);
   running_id = 0;
-  thread main = thread(running_id);
+  thread* main = new thread();
   threads[0] = main;
   quantum = quantum_usecs;
   return SUCCESS;
@@ -60,7 +70,6 @@ void setup_timer(int quantum_usecs) {
   timer.it_value.tv_usec = quantum_usecs;
   timer.it_interval.tv_sec = 0;
   timer.it_interval.tv_usec = quantum_usecs;
-  // Start a virtual timer. It counts down whenever this process is executing.
   if (setitimer(ITIMER_VIRTUAL, &timer, nullptr)) {
 	std::cerr << ERROR << SET_TIMER_ERROR << std::endl;
 	exit(EXIT_FAILURE);
@@ -70,9 +79,9 @@ void setup_timer(int quantum_usecs) {
 int uthread_spawn(thread_entry_point entry_point) {
   block_signals();
   int id = get_next_available_id();
-  thread new_thread = thread(id, entry_point);
+  thread* new_thread = new thread(id, entry_point);
   threads[id] = new_thread;
-  ready.push(new_thread);
+  ready.push_back(new_thread);
   unblock_signals();
   return SUCCESS;
 }
@@ -81,26 +90,25 @@ int uthread_spawn(thread_entry_point entry_point) {
 int uthread_terminate(int tid) {
   block_signals();
   if (threads.find(tid) == threads.end()
-	  || threads.find(tid)->second.get_state() == TERMINATED) {
+	  || threads.find(tid)->second->get_state() == TERMINATED) {
 	unblock_signals();
 	return FAILURE;
   }
   if (!tid) {
 	for (auto &it : threads) {
-	  if (it.second.get_state() != TERMINATED) {
-		it.second.free();
+	  if (it.second->get_state() != TERMINATED) {
+		it.second->free();
 	  }
 	}
 	exit(EXIT_SUCCESS);
   }
   if (running_id == tid) {
-	threads[tid].free();
-	threads[tid].set_state(TERMINATED);
-//	  remove_thread ();
+	threads[tid]->free();
+	threads[tid]->set_state(TERMINATED);
 	timer_handler(SIGVTALRM);
   } else {
-	threads[tid].free();
-	threads[tid].set_state(TERMINATED);
+	threads[tid]->free();
+	threads[tid]->set_state(TERMINATED);
 	remove_thread();
 	unblock_signals();
 	return SUCCESS;
@@ -109,12 +117,12 @@ int uthread_terminate(int tid) {
 }
 
 void remove_thread() {
-  queue<thread> tmp;
+  std::deque<thread*> tmp;
   while (!ready.empty()) {
-	thread tmp_thread = ready.front();
-	ready.pop();
-	if (tmp_thread.get_state() == READY) {
-	  tmp.push(tmp_thread);
+	thread* tmp_thread = ready.front();
+	ready.pop_front();
+	if (tmp_thread->get_state() == READY) {
+	  tmp.push_back(tmp_thread);
 	}
 
   }
@@ -123,25 +131,23 @@ void remove_thread() {
 
 int uthread_block(int tid) {
   block_signals();
+
   if (threads.find(tid) == threads.end() || !tid) {
 	unblock_signals();
 	return FAILURE;
   }
 
   if (running_id == tid) {
-	threads[tid].set_state(BLOCKED);
+	threads[tid]->set_state(BLOCKED);
+	remove_thread();
 	timer_handler(SIGVTALRM);
 	unblock_signals();
 	return SUCCESS;
   }
 
-  if (threads[tid].get_state() != BLOCKED) {
-	if (threads[tid].get_state() == READY) {
-	  threads[tid].set_state(BLOCKED);
+  if (threads[tid]->get_state() == READY) {
+	  threads[tid]->set_state(BLOCKED);
 	  remove_thread();
-	} else {
-	  threads[tid].set_state(BLOCKED);
-	}
   }
   unblock_signals();
   return SUCCESS;
@@ -149,16 +155,32 @@ int uthread_block(int tid) {
 
 int uthread_resume(int tid){
   block_signals();
+
   if (threads.find(tid) == threads.end()){
 	unblock_signals();
 	return FAILURE;
   }
-  if (threads[tid].get_state() == BLOCKED){
-	threads[tid].set_state(READY);
-	ready.push(threads[tid]);
+
+  if (threads[tid]->get_state() == BLOCKED){
+	threads[tid]->set_state(READY);
+	ready.push_back(threads[tid]);
   }
   unblock_signals();
   return SUCCESS;
+}
+
+int uthread_sleep(int num_quantums) {
+    block_signals();
+    if (!running_id) {
+        unblock_signals();
+        return FAILURE;
+    }
+
+    threads[running_id]->set_state(SLEEPING);
+    threads[running_id]->set_sleep_time(num_quantums+1);
+    timer_handler(SIGVTALRM);
+    unblock_signals();
+    return SUCCESS;
 }
 
 
@@ -173,13 +195,13 @@ int uthread_get_quantums(int tid) {
 	exit(EXIT_FAILURE);
   }
   unblock_signals();
-  return threads[tid].get_num_of_quantums();
+  return threads[tid]->get_num_of_quantums();
 }
 
 int get_next_available_id() {
   int active_threads = 0;
   for (auto const &it : threads) {
-	if (it.second.get_state() != TERMINATED) {
+	if (it.second->get_state() != TERMINATED) {
 	  active_threads++;
 	} else { break; }
   }
@@ -196,6 +218,18 @@ void block_signals() {
 
 void unblock_signals() {
   sigprocmask(SIG_UNBLOCK, &set, nullptr);
+}
+
+void sleep_wake() {
+    for (auto &it: threads) {
+        if (it.second->get_state() == SLEEPING) {
+            it.second->decrease_sleep_time();
+            if (!it.second->get_sleep_time()) {
+                it.second->set_state(READY);
+                ready.push_back(it.second);
+            }
+        }
+    }
 }
 
 void f() {

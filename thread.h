@@ -7,11 +7,12 @@
 #define _THREAD_H_
 
 #include <stdlib.h>
+#include <algorithm>
 #include <iostream>
 #include <csetjmp>
 #include <map>
 #include <sys/time.h>
-#include <queue>
+#include <deque>
 #include <vector>
 #include <stdio.h>
 #include <set>
@@ -71,7 +72,7 @@ address_t translate_address(address_t addr)
 
 
 //thread_entry_point main_entry_point;
-using std::queue;
+using std::deque;
 using std::map;
 
 int quantum;
@@ -89,24 +90,26 @@ class thread {
   int _id;
   char *_stack;
   int _num_of_quantums;
+  int _sleep_time;
 
  public:
   enum state _state;
   sigjmp_buf _env;
-  thread () = default;
+//  thread () = default;
+  thread(): _id(0), _stack(nullptr), _state(RUNNING), _num_of_quantums(0) {
+      sigemptyset(&_env->__saved_mask);
+  }
   thread (const int &id, thread_entry_point entry_point = nullptr)
-	  : _id (id), _state (READY), _stack (new char[STACK_SIZE]), _num_of_quantums(0)
+	  : _id (id), _state (READY), _stack (new char[STACK_SIZE]), _num_of_quantums(0), _sleep_time(0)
   {
-	if (_id)
-	  {
-		sigsetjmp (_env, 1);
-		auto sp = (address_t)_stack + STACK_SIZE - sizeof (address_t);
-		auto pc = (address_t)entry_point;
-		(_env->__jmpbuf)[JB_PC] = translate_address (pc);
-		(_env->__jmpbuf)[JB_SP] = translate_address (sp);
-	  }
+    sigsetjmp (_env, 1);
+    auto sp = (address_t)_stack + STACK_SIZE - sizeof (address_t);
+    auto pc = (address_t)entry_point;
+    (_env->__jmpbuf)[JB_PC] = translate_address (pc);
+    (_env->__jmpbuf)[JB_SP] = translate_address (sp);
 	sigemptyset(&_env->__saved_mask);
   }
+
 
 //  ~thread()
 //  {delete[] _stack;}
@@ -128,6 +131,18 @@ class thread {
 
   void set_state(enum state s){
 	_state = s;
+  }
+
+  void set_sleep_time(int sleep_time) {
+      _sleep_time = sleep_time;
+  }
+
+  void decrease_sleep_time() {
+      _sleep_time--;
+  }
+
+  int get_sleep_time() const {
+      return _sleep_time;
   }
 
   void free(){
