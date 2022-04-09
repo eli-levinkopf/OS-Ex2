@@ -1,7 +1,7 @@
 //
 // Created by Eli Levinkopf on 01/04/2022.
 //
-#include"uthreads.h"
+//#include"uthreads.h"
 #include "thread.h"
 
 queue<thread> ready;
@@ -149,24 +149,24 @@ void f ()
 	}
 }
 
-int main ()
-{
-  uthread_init (10);
-  uthread_spawn (f);
-  uthread_spawn (f);
-  uthread_spawn (f);
-  uthread_spawn (f);
-
-  int i = 0;
-  while (1)
-  {
-    i++;
-    if (i%10000==0)
-    {
-      std::cout << running.get_id ();
-    }
-
-  }
-
-}
+//int main ()
+//{
+//  uthread_init (10);
+//  uthread_spawn (f);
+//  uthread_spawn (f);
+//  uthread_spawn (f);
+//  uthread_spawn (f);
+//
+//  int i = 0;
+//  while (1)
+//  {
+//    i++;
+//    if (i%10000==0)
+//    {
+//      std::cout << running.get_id ();
+//    }
+//
+//  }
+//
+//}
 
