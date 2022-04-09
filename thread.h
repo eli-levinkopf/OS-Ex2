@@ -14,11 +14,11 @@ enum state {
 
 class thread {
   int _id;
-  enum state _state;
   char *_stack;
   int _num_of_quantums;
 
  public:
+  enum state _state;
   sigjmp_buf _env;
   thread () = default;
   thread (const int &id, thread_entry_point entry_point = nullptr)
@@ -52,6 +52,14 @@ class thread {
 
   void set_quantum()
   {++_num_of_quantums;}
+
+  void set_state(enum state s){
+	_state = s;
+  }
+
+  void free(){
+	delete[] _stack;
+  }
 
 };
 

@@ -10,6 +10,7 @@ std::map<int, thread> threads;
 thread_entry_point main_entry_point;
 int get_next_available_id ();
 void setup_timer (int quantum_usecs);
+void remove_thread();
 
 
 void timer_handler (int sig)
@@ -54,10 +55,10 @@ void setup_timer (int quantum_usecs)
 	  std::cerr << ERROR << SIG_ACTION_ERROR << std::endl;
 	  exit (EXIT_FAILURE);
 	}
-  timer.it_value.tv_sec = quantum_usecs / 1000000;
-  timer.it_value.tv_usec = quantum_usecs % 1000000;
-  timer.it_interval.tv_sec = quantum_usecs / 1000000;
-  timer.it_interval.tv_usec = quantum_usecs % 1000000;
+  timer.it_value.tv_sec =  0;
+  timer.it_value.tv_usec = quantum_usecs;
+  timer.it_interval.tv_sec = 0;
+  timer.it_interval.tv_usec = quantum_usecs;
   // Start a virtual timer. It counts down whenever this process is executing.
   if (setitimer (ITIMER_VIRTUAL, &timer, nullptr))
 	{
@@ -65,6 +66,35 @@ void setup_timer (int quantum_usecs)
 	  exit (EXIT_FAILURE);
 	}
 }
+
+int uthread_terminate(int tid){
+  if (threads.find (tid) == threads.end() || threads.find (tid)->second.get_state() == TERMINATED){
+	return FAILURE;
+  }
+  if (!tid || running.get_id() == tid){
+	for (auto &it: threads){
+	  it.second.free();
+	}
+	exit (EXIT_SUCCESS);
+  }
+  threads[tid].free();
+  threads[tid].set_state(TERMINATED);
+  remove_thread();
+  return SUCCESS;
+}
+
+void remove_thread(){
+  queue<thread> tmp;
+  while(!tmp.empty()){
+	thread tmp_thread = ready.front();
+	if (tmp_thread.get_state() == READY){
+	  tmp.push (tmp_thread);
+	}
+  }
+  ready = tmp;
+}
+
+
 
 int uthread_spawn (thread_entry_point entry_point)
 {
