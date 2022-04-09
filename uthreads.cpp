@@ -71,12 +71,17 @@ int uthread_terminate(int tid){
   if (threads.find (tid) == threads.end() || threads.find (tid)->second.get_state() == TERMINATED){
 	return FAILURE;
   }
-  if (!tid || running.get_id() == tid){
+  if (!tid){
 	for (auto &it: threads){
 	  it.second.free();
 	}
 	exit (EXIT_SUCCESS);
   }
+  if (running.get_id() == tid){
+	  threads[tid].free();
+	  threads[tid].set_state(TERMINATED);
+	  timer_handler(SIGVTALRM);
+	}
   threads[tid].free();
   threads[tid].set_state(TERMINATED);
   remove_thread();
