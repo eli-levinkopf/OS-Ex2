@@ -88,7 +88,7 @@ int uthread_terminate (int tid)
 	{
 	  threads[tid].free ();
 	  threads[tid].set_state (TERMINATED);
-	  remove_thread ();
+//	  remove_thread ();
 	  timer_handler (SIGVTALRM);
 	}
   else
@@ -104,13 +104,15 @@ int uthread_terminate (int tid)
 void remove_thread ()
 {
   queue<thread> tmp;
-  while (!tmp.empty ())
+  while (!ready.empty ())
 	{
 	  thread tmp_thread = ready.front ();
+	  ready.pop();
 	  if (tmp_thread.get_state () == READY)
 		{
 		  tmp.push (tmp_thread);
 		}
+
 	}
   ready = tmp;
 }
