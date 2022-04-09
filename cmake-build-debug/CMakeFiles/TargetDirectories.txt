@@ -1,3 +1,0 @@
-/cs/usr/omerbs110/CLionProjects/OS-Ex2/cmake-build-debug/CMakeFiles/rebuild_cache.dir
-/cs/usr/omerbs110/CLionProjects/OS-Ex2/cmake-build-debug/CMakeFiles/edit_cache.dir
-/cs/usr/omerbs110/CLionProjects/OS-Ex2/cmake-build-debug/CMakeFiles/OS_Ex2.dir
