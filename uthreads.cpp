@@ -8,9 +8,13 @@ queue<thread> ready;
 int running_id;
 std::map<int, thread> threads;
 thread_entry_point main_entry_point;
+sigset_t set;
 int get_next_available_id ();
 void setup_timer (int quantum_usecs);
 void remove_thread ();
+void block_signals();
+void unblock_signals();
+
 
 void timer_handler (int sig)
 {
@@ -71,8 +75,10 @@ void setup_timer (int quantum_usecs)
 
 int uthread_terminate (int tid)
 {
+  block_signals();
   if (threads.find (tid) == threads.end () || threads.find (tid)->second.get_state () == TERMINATED)
 	{
+	  unblock_signals();
 	  return FAILURE;
 	}
   if (!tid)
@@ -97,8 +103,10 @@ int uthread_terminate (int tid)
 	  threads[tid].free ();
 	  threads[tid].set_state (TERMINATED);
 	  remove_thread ();
+	  unblock_signals();
 	  return SUCCESS;
 	}
+	unblock_signals();
 }
 
 void remove_thread ()
@@ -119,10 +127,12 @@ void remove_thread ()
 
 int uthread_spawn (thread_entry_point entry_point)
 {
+  block_signals();
   int id = get_next_available_id ();
   thread new_thread = thread (id, entry_point);
   threads[id] = new_thread;
   ready.push (new_thread);
+  unblock_signals();
   return SUCCESS;
 }
 
@@ -134,11 +144,13 @@ int uthread_get_total_quantums ()
 
 int uthread_get_quantums (int tid)
 {
+  block_signals();
   if (threads.find (tid) == threads.end ())
 	{
 	  std::cerr << ERROR << TID_ERROR << std::endl;
 	  exit (EXIT_FAILURE);
 	}
+	unblock_signals();
   return threads[tid].get_num_of_quantums ();
 }
 
@@ -158,6 +170,16 @@ int get_next_available_id ()
 	{ return FAILURE; }
 
   return active_threads;
+}
+
+void block_signals(){
+  sigemptyset(&set);
+  sigaddset(&set, SIGALRM);
+  sigprocmask(SIG_BLOCK, &set, nullptr);
+}
+
+void unblock_signals(){
+  sigprocmask(SIG_UNBLOCK, &set, nullptr);
 }
 
 void f ()
