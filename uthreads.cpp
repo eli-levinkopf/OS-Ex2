@@ -147,6 +147,20 @@ int uthread_block(int tid) {
   return SUCCESS;
 }
 
+int uthread_resume(int tid){
+  block_signals();
+  if (threads.find(tid) == threads.end()){
+	unblock_signals();
+	return FAILURE;
+  }
+  if (threads[tid].get_state() == BLOCKED){
+	threads[tid].set_state(READY);
+	ready.push(threads[tid]);
+  }
+  unblock_signals();
+  return SUCCESS;
+}
+
 
 int uthread_get_tid() { return running_id; }
 
