@@ -5,7 +5,7 @@
 #include "thread.h"
 
 queue<thread> ready;
-thread running;
+int running_id;
 std::map<int, thread> threads;
 thread_entry_point main_entry_point;
 int get_next_available_id ();
@@ -14,25 +14,25 @@ void remove_thread ();
 
 void timer_handler (int sig)
 {
-  if (!ready.empty ())
-	{
-	  if (running.get_state () != TERMINATED)
-		{
-		  int ret_val = sigsetjmp (running._env, 1);
-		  if (ret_val)
-			{
-			  threads[running.get_id ()].set_quantum ();
-			  ++total_quantums;
-			  return;
-			}
-		}
-	  ready.push (running);
-	  running = ready.front ();
-	  ready.pop ();
-	  threads[running.get_id ()].set_quantum ();
-	  ++total_quantums;
-	  siglongjmp (running._env, 1);
-	}
+    if (!ready.empty ())
+    {
+        if (threads[running_id].get_state () != TERMINATED)
+        {
+            int ret_val = sigsetjmp (threads[running_id]._env, 1);
+            if (ret_val)
+            {
+                threads[running_id].set_quantum ();
+                ++total_quantums;
+                return;
+            }
+            ready.push (threads[running_id]);
+        }
+        running_id = ready.front ().get_id();
+        ready.pop ();
+        threads[running_id].set_quantum ();
+        ++total_quantums;
+        siglongjmp (threads[running_id]._env, 1);
+    }
 }
 
 int uthread_init (int quantum_usecs)
@@ -41,9 +41,9 @@ int uthread_init (int quantum_usecs)
 	{ return FAILURE; }
 
   setup_timer (quantum_usecs);
-  thread main = thread (0);
+  running_id = 0;
+  thread main = thread (running_id);
   threads[0] = main;
-  running = main;
   quantum = quantum_usecs;
   return SUCCESS;
 }
@@ -71,8 +71,7 @@ void setup_timer (int quantum_usecs)
 
 int uthread_terminate (int tid)
 {
-  if (threads.find (tid) == threads.end ()
-	  || threads.find (tid)->second.get_state () == TERMINATED)
+  if (threads.find (tid) == threads.end () || threads.find (tid)->second.get_state () == TERMINATED)
 	{
 	  return FAILURE;
 	}
@@ -80,11 +79,13 @@ int uthread_terminate (int tid)
 	{
 	  for (auto &it: threads)
 		{
-		  it.second.free ();
+	      if (it.second.get_state() != TERMINATED) {
+	          it.second.free ();
+	      }
 		}
 	  exit (EXIT_SUCCESS);
 	}
-  if (running.get_id () == tid)
+  if (running_id == tid)
 	{
 	  threads[tid].free ();
 	  threads[tid].set_state (TERMINATED);
@@ -97,7 +98,6 @@ int uthread_terminate (int tid)
 	  threads[tid].set_state (TERMINATED);
 	  remove_thread ();
 	  return SUCCESS;
-
 	}
 }
 
@@ -127,7 +127,7 @@ int uthread_spawn (thread_entry_point entry_point)
 }
 
 int uthread_get_tid ()
-{ return running.get_id (); }
+{ return running_id; }
 
 int uthread_get_total_quantums ()
 { return total_quantums; }
@@ -168,7 +168,7 @@ void f ()
 	  i++;
 	  if (i % 10000 == 0)
 		{
-		  std::cout << running.get_id ();
+		  std::cout << running_id;
 		}
 	}
 }

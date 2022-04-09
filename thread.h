@@ -131,6 +131,7 @@ class thread {
 
   void free(){
 	delete[] _stack;
+	_stack = nullptr;
   }
 
 };
