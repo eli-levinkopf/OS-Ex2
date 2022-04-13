@@ -1,0 +1,46 @@
+omerbs110, eli.levinkopf
+Omer Ben Simhon (316155233), Eli Levinkopf (205821879)
+EX: 2
+
+FILES:
+uthreads.cpp -- a file containing the uthreads library implementation
+myfile.h -- a file containing the definition of thread class
+
+REMARKS:
+-
+
+ANSWERS:
+
+Q1:
+One general use for user-level threads can be a control system of a weather monitoring station. The application has to
+monitor several temperature sensors, and drive a display that changes when the temperature reaches a certain threshold,
+and perform various calculations using the hardware. The advantage of using user-level threads in such system is that the user
+can decide when to give resources to each sensor according to the temperature threshold, which is different and more efficient
+in this case than kernel level threads that are managed according to the scheduler algorithm that is not aware of those changes.
+
+Q2:
+Advantage:
+- When creating a process for each tab, we prevent the creation of a shared memory space for two different tabs, and this way
+we prevent from tabs to get access to the memory of other tabs.
+
+Disadvantage:
+- Using processes requires high overhead compared to kernel-level threads. Context switch is a more complicated procedure
+when switching from one process to another, than from switching from one thread to another. In addition, holding a PCB for multiple
+proccess requires more memory usage than saving the context of a thread.
+
+Q3:
+THe interrupts and signals involved during the command execution are:
+1. A hardware interrupt from the keyboard to the shell process invoked by the typing kill <pid>.
+2. A software interrupt from the shell process to the OS that the kill command causes.
+3. A signal sent from the OS to the "Shotwell" process which causes it to terminate itself.
+
+Q4:
+Virtual time is defined as the CPU time required to complete a job as if there were no interruptions.
+Real time is the actual time during which a job takes place.
+# TODO: examples
+
+Q5:
+sigsetjmp - This functions saves the current state of the program such as the PC register, the SP register and the
+signal mask.
+siglongjmp - This function loads the previous state that sigsetjmp saved, restoring the registers state and the signal mask
+as described above.
