@@ -1,7 +1,6 @@
 //
 // Created by Eli Levinkopf on 01/04/2022.
 //
-//#include"uthreads.h"
 #include "thread.h"
 
 std::deque<thread*> ready;
@@ -9,6 +8,7 @@ int running_id;
 std::map<int, thread*> threads;
 sigset_t set;
 int get_next_available_id();
+void terminate_all_threads();
 void setup_timer(int quantum_usecs);
 void remove_thread();
 void block_signals();
@@ -20,6 +20,7 @@ void timer_handler(int sig) {
     if (threads[running_id]->get_state() != RUNNING || threads[running_id]->get_state() != READY) {
         if (setitimer(ITIMER_VIRTUAL, &timer, nullptr)) {
             std::cerr << ERROR << SET_TIMER_ERROR << std::endl;
+            terminate_all_threads();
             exit(EXIT_FAILURE);
         }
     }
@@ -43,8 +44,6 @@ void timer_handler(int sig) {
 	ready.pop_front();
 	threads[running_id]->set_quantum();
 	++total_quantums;
-	thread* t = threads[running_id];
-	std::map<int, thread*> map = threads;
 	int a = running_id;
 	siglongjmp(threads[running_id]->_env, 1);
   }
@@ -52,6 +51,13 @@ void timer_handler(int sig) {
       threads[running_id]->set_quantum();
       ++total_quantums;
   }
+}
+
+void terminate_all_threads() {
+    for (auto &it : threads) {
+        it.second->free();
+        free(it.second);
+    }
 }
 
 int fail(const std::string& exit_message) {
@@ -76,6 +82,7 @@ void setup_timer(int quantum_usecs) {
   sa.sa_handler = &timer_handler;
   if (sigaction(SIGVTALRM, &sa, nullptr) < 0) {
 	std::cerr << ERROR << SIG_ACTION_ERROR << std::endl;
+	terminate_all_threads();
 	exit(EXIT_FAILURE);
   }
   timer.it_value.tv_sec = 0;
@@ -84,20 +91,26 @@ void setup_timer(int quantum_usecs) {
   timer.it_interval.tv_usec = quantum_usecs;
   if (setitimer(ITIMER_VIRTUAL, &timer, nullptr)) {
 	std::cerr << ERROR << SET_TIMER_ERROR << std::endl;
+	terminate_all_threads();
 	exit(EXIT_FAILURE);
   }
 }
 
 int uthread_spawn(thread_entry_point entry_point) {
-  block_signals();
+    block_signals();
+    if (!entry_point) {
+        unblock_signals();
+        return fail("Entry point can't be null");
+    }
   int id = get_next_available_id();
   if (id >= MAX_THREAD_NUM) {
+      unblock_signals();
       return fail("The number of threads reached maximum"); }
-  thread* new_thread = new thread(id, entry_point);
+  thread* new_thread = new thread(id, entry_point);;
   threads[id] = new_thread;
   ready.push_back(new_thread);
   unblock_signals();
-  return SUCCESS;
+  return id;
 }
 
 
@@ -109,19 +122,16 @@ int uthread_terminate(int tid) {
 	return fail("Terminating this threads is forbidden");
   }
   if (!tid) {
-	for (auto &it : threads) {
-	  if (it.second->get_state() != TERMINATED) {
-		delete it.second;
-	  }
-	}
-	exit(EXIT_SUCCESS);
+      terminate_all_threads();
+      exit(EXIT_SUCCESS);
   }
   if (running_id == tid) {
-	delete threads[tid];
+//	delete threads[tid];
+    threads[tid]->free();
 	threads[tid]->set_state(TERMINATED);
 	timer_handler(SIGVTALRM);
   } else {
-	delete threads[tid];
+    threads[tid]->free();
 	threads[tid]->set_state(TERMINATED);
 	remove_thread();
 	unblock_signals();
@@ -146,7 +156,9 @@ void remove_thread() {
 int uthread_block(int tid) {
   block_signals();
 
-  if (threads.find(tid) == threads.end() || !tid) {
+  auto t = threads;
+
+  if (threads.count(tid) == 0 || !tid) {
 	unblock_signals();
 	return fail("Blocking this thread is forbidden");
   }
@@ -213,6 +225,7 @@ int uthread_get_quantums(int tid) {
 
 int get_next_available_id() {
   int active_threads = 0;
+  auto t = threads;
   for (auto const &it : threads) {
 	if (it.second->get_state() != TERMINATED) {
 	  active_threads++;
@@ -243,35 +256,35 @@ void sleep_wake() {
         }
     }
 }
-//
-//void f() {
-//  int i = 0;
-//  while (1) {
-//	i++;
-//	if (i % 10000 == 0) {
-//	  std::cout << running_id;
-//	}
-//  }
-//}
 
-//int main ()
-//{
-//  uthread_init (10);
-//  uthread_spawn (f);
-//  uthread_spawn (f);
-//  uthread_spawn (f);
-//  uthread_spawn (f);
-//
-//  int i = 0;
-//  while (1)
-//  {
-//    i++;
-//    if (i%10000==0)
-//    {
-//      std::cout << running.get_id ();
-//    }
-//
-//  }
-//
-//}
+void f() {
+  int i = 0;
+  while (1) {
+	i++;
+	if (i % 10000 == 0) {
+	  std::cout << running_id;
+	}
+  }
+}
+
+int main ()
+{
+  uthread_init (10);
+  uthread_spawn (f);
+  uthread_spawn (f);
+  uthread_spawn (f);
+  uthread_spawn (f);
+
+  int i = 0;
+  while (1)
+  {
+    i++;
+    if (i%10000==0)
+    {
+      std::cout << running_id;
+    }
+
+  }
+
+}
 

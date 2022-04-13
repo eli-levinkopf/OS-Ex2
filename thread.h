@@ -80,8 +80,6 @@ struct itimerval timer;
 int total_quantums = 1;
 
 
-
-
 enum state {
   RUNNING, READY, BLOCKED, SLEEPING, TERMINATED
 };
@@ -99,7 +97,7 @@ class thread {
   thread(): _id(0), _stack(nullptr), _state(RUNNING), _num_of_quantums(1) {
       sigemptyset(&_env->__saved_mask);
   }
-  thread (const int &id, thread_entry_point entry_point = nullptr)
+  thread (const int &id, thread_entry_point entry_point)
 	  : _id (id), _state (READY), _stack (new char[STACK_SIZE]), _num_of_quantums(0), _sleep_time(0)
   {
     sigsetjmp (_env, 1);
@@ -148,10 +146,10 @@ class thread {
       return _sleep_time;
   }
 
-//  void free(){
-//	delete[] _stack;
-//	_stack = nullptr;
-//  }
+  void free(){
+	delete[] _stack;
+	_stack = nullptr;
+  }
 
 };
 
