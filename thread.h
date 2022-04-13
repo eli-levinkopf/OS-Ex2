@@ -77,7 +77,7 @@ using std::map;
 
 int quantum;
 struct itimerval timer;
-int total_quantums = 0;
+int total_quantums = 1;
 
 
 
@@ -96,7 +96,7 @@ class thread {
   enum state _state;
   sigjmp_buf _env;
 //  thread () = default;
-  thread(): _id(0), _stack(nullptr), _state(RUNNING), _num_of_quantums(0) {
+  thread(): _id(0), _stack(nullptr), _state(RUNNING), _num_of_quantums(1) {
       sigemptyset(&_env->__saved_mask);
   }
   thread (const int &id, thread_entry_point entry_point = nullptr)
@@ -111,8 +111,11 @@ class thread {
   }
 
 
-//  ~thread()
-//  {delete[] _stack;}
+  ~thread()
+  {
+      delete[] _stack;
+      _stack = nullptr;
+  }
 
 //  sigjmp_buf* get_env() const
 //  {return _env;}
@@ -145,10 +148,10 @@ class thread {
       return _sleep_time;
   }
 
-  void free(){
-	delete[] _stack;
-	_stack = nullptr;
-  }
+//  void free(){
+//	delete[] _stack;
+//	_stack = nullptr;
+//  }
 
 };
 

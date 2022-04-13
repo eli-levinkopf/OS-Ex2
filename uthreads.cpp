@@ -17,13 +17,17 @@ void sleep_wake();
 
 void timer_handler(int sig) {
     sleep_wake();
-    int b = running_id;
+    if (threads[running_id]->get_state() != RUNNING || threads[running_id]->get_state() != READY) {
+        if (setitimer(ITIMER_VIRTUAL, &timer, nullptr)) {
+            std::cerr << ERROR << SET_TIMER_ERROR << std::endl;
+            exit(EXIT_FAILURE);
+        }
+    }
+//    std::cout << "running id: " << running_id << " quantum: "<< uthread_get_quantums(running_id) << std::endl;
   if (!ready.empty()) {
 	if (threads[running_id]->get_state() != TERMINATED) {
 	  int ret_val = sigsetjmp(threads[running_id]->_env, 1);
 	  if (ret_val) {
-		threads[running_id]->set_quantum();
-		++total_quantums;
 		return;
 	  }
 	}
@@ -39,6 +43,8 @@ void timer_handler(int sig) {
 	ready.pop_front();
 	threads[running_id]->set_quantum();
 	++total_quantums;
+	thread* t = threads[running_id];
+	std::map<int, thread*> map = threads;
 	int a = running_id;
 	siglongjmp(threads[running_id]->_env, 1);
   }
@@ -48,12 +54,18 @@ void timer_handler(int sig) {
   }
 }
 
+int fail(const std::string& exit_message) {
+    std::cerr << "thread library error: " << exit_message << std::endl;
+    return FAILURE;
+}
 int uthread_init(int quantum_usecs) {
-  if (quantum_usecs < 0) { return FAILURE; }
+  if (quantum_usecs <= 0) {
+      return fail("quantum should be positive");
+  }
 
-  setup_timer(quantum_usecs);
   running_id = 0;
   thread* main = new thread();
+  setup_timer(quantum_usecs);
   threads[0] = main;
   quantum = quantum_usecs;
   return SUCCESS;
@@ -79,6 +91,8 @@ void setup_timer(int quantum_usecs) {
 int uthread_spawn(thread_entry_point entry_point) {
   block_signals();
   int id = get_next_available_id();
+  if (id >= MAX_THREAD_NUM) {
+      return fail("The number of threads reached maximum"); }
   thread* new_thread = new thread(id, entry_point);
   threads[id] = new_thread;
   ready.push_back(new_thread);
@@ -92,22 +106,22 @@ int uthread_terminate(int tid) {
   if (threads.find(tid) == threads.end()
 	  || threads.find(tid)->second->get_state() == TERMINATED) {
 	unblock_signals();
-	return FAILURE;
+	return fail("Terminating this threads is forbidden");
   }
   if (!tid) {
 	for (auto &it : threads) {
 	  if (it.second->get_state() != TERMINATED) {
-		it.second->free();
+		delete it.second;
 	  }
 	}
 	exit(EXIT_SUCCESS);
   }
   if (running_id == tid) {
-	threads[tid]->free();
+	delete threads[tid];
 	threads[tid]->set_state(TERMINATED);
 	timer_handler(SIGVTALRM);
   } else {
-	threads[tid]->free();
+	delete threads[tid];
 	threads[tid]->set_state(TERMINATED);
 	remove_thread();
 	unblock_signals();
@@ -134,7 +148,7 @@ int uthread_block(int tid) {
 
   if (threads.find(tid) == threads.end() || !tid) {
 	unblock_signals();
-	return FAILURE;
+	return fail("Blocking this thread is forbidden");
   }
 
   if (running_id == tid) {
@@ -158,7 +172,7 @@ int uthread_resume(int tid){
 
   if (threads.find(tid) == threads.end()){
 	unblock_signals();
-	return FAILURE;
+	return fail("This thread doesn't exist");
   }
 
   if (threads[tid]->get_state() == BLOCKED){
@@ -173,7 +187,7 @@ int uthread_sleep(int num_quantums) {
     block_signals();
     if (!running_id) {
         unblock_signals();
-        return FAILURE;
+        return fail("Main thread can't sleep");
     }
 
     threads[running_id]->set_state(SLEEPING);
@@ -191,8 +205,7 @@ int uthread_get_total_quantums() { return total_quantums; }
 int uthread_get_quantums(int tid) {
   block_signals();
   if (threads.find(tid) == threads.end()) {
-	std::cerr << ERROR << TID_ERROR << std::endl;
-	exit(EXIT_FAILURE);
+	return fail("This thread doesn't exist");
   }
   unblock_signals();
   return threads[tid]->get_num_of_quantums();
@@ -205,7 +218,6 @@ int get_next_available_id() {
 	  active_threads++;
 	} else { break; }
   }
-  if (active_threads >= MAX_THREAD_NUM) { return FAILURE; }
 
   return active_threads;
 }
@@ -231,16 +243,16 @@ void sleep_wake() {
         }
     }
 }
-
-void f() {
-  int i = 0;
-  while (1) {
-	i++;
-	if (i % 10000 == 0) {
-	  std::cout << running_id;
-	}
-  }
-}
+//
+//void f() {
+//  int i = 0;
+//  while (1) {
+//	i++;
+//	if (i % 10000 == 0) {
+//	  std::cout << running_id;
+//	}
+//  }
+//}
 
 //int main ()
 //{
