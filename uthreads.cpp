@@ -1,6 +1,4 @@
-//
-// Created by Eli Levinkopf on 01/04/2022.
-//
+
 #include "thread.h"
 
 std::deque<thread*> ready;
@@ -24,7 +22,6 @@ void timer_handler(int sig) {
             exit(EXIT_FAILURE);
         }
     }
-//    std::cout << "running id: " << running_id << " quantum: "<< uthread_get_quantums(running_id) << std::endl;
   if (!ready.empty()) {
 	if (threads[running_id]->get_state() != TERMINATED) {
 	  int ret_val = sigsetjmp(threads[running_id]->_env, 1);
@@ -126,7 +123,6 @@ int uthread_terminate(int tid) {
       exit(EXIT_SUCCESS);
   }
   if (running_id == tid) {
-//	delete threads[tid];
     threads[tid]->free();
 	threads[tid]->set_state(TERMINATED);
 	timer_handler(SIGVTALRM);
@@ -155,8 +151,6 @@ void remove_thread() {
 
 int uthread_block(int tid) {
   block_signals();
-
-  auto t = threads;
 
   if (threads.count(tid) == 0 || !tid) {
 	unblock_signals();
@@ -225,7 +219,6 @@ int uthread_get_quantums(int tid) {
 
 int get_next_available_id() {
   int active_threads = 0;
-  auto t = threads;
   for (auto const &it : threads) {
 	if (it.second->get_state() != TERMINATED) {
 	  active_threads++;
@@ -255,36 +248,5 @@ void sleep_wake() {
             }
         }
     }
-}
-
-void f() {
-  int i = 0;
-  while (1) {
-	i++;
-	if (i % 10000 == 0) {
-	  std::cout << running_id;
-	}
-  }
-}
-
-int main ()
-{
-  uthread_init (10);
-  uthread_spawn (f);
-  uthread_spawn (f);
-  uthread_spawn (f);
-  uthread_spawn (f);
-
-  int i = 0;
-  while (1)
-  {
-    i++;
-    if (i%10000==0)
-    {
-      std::cout << running_id;
-    }
-
-  }
-
 }
 

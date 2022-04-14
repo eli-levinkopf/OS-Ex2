@@ -4,7 +4,7 @@ EX: 2
 
 FILES:
 uthreads.cpp -- a file containing the uthreads library implementation
-myfile.h -- a file containing the definition of thread class
+thread.h -- a file containing the definition of thread class
 
 REMARKS:
 -
@@ -37,7 +37,9 @@ THe interrupts and signals involved during the command execution are:
 Q4:
 Virtual time is defined as the CPU time required to complete a job as if there were no interruptions.
 Real time is the actual time during which a job takes place.
-# TODO: examples
+An example of virtual time usage is the time that each chrome tab (a proccess) gets according to the scheduler.
+An example of real time is the time an alarm clock uses when the alarm happens - it knows when to start an alarm according
+to the real time, and not according to the virtual time that the scheduler uses.
 
 Q5:
 sigsetjmp - This functions saves the current state of the program such as the PC register, the SP register and the

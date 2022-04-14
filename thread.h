@@ -93,7 +93,6 @@ class thread {
  public:
   enum state _state;
   sigjmp_buf _env;
-//  thread () = default;
   thread(): _id(0), _stack(nullptr), _state(RUNNING), _num_of_quantums(1) {
       sigemptyset(&_env->__saved_mask);
   }
@@ -115,8 +114,6 @@ class thread {
       _stack = nullptr;
   }
 
-//  sigjmp_buf* get_env() const
-//  {return _env;}
 
   int get_id () const
   {return _id;}
